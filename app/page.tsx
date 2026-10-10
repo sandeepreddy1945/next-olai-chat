@@ -80,7 +80,7 @@ const renderPart = (
 
   if (isReasoningUIPart(part)) {
     return (
-      <Reasoning key={key} isStreaming={isStreaming}>
+      <Reasoning defaultOpen={false} key={key} isStreaming={isStreaming}>
         <ReasoningTrigger />
         <ReasoningContent>{part.text}</ReasoningContent>
       </Reasoning>

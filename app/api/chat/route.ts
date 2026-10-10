@@ -76,6 +76,11 @@ ${SUPPORT_REPLY}`,
         stopWhen: stepCountIs(5),
         toolChoice: "auto",
         tools,
+        providerOptions: {
+          ollama: {
+            think: true,
+          },
+        },
         onFinish: async () => {
           await closeMcpClient(mcpClient)
         },
@@ -84,6 +89,7 @@ ${SUPPORT_REPLY}`,
       const stream = toUIMessageStream({
         onError: () => SUPPORT_REPLY,
         originalMessages: messages,
+        sendReasoning: true,
         stream: result.stream,
         tools,
       })
