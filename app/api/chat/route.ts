@@ -24,6 +24,15 @@ type ChatRequest = {
   messages?: UIMessage[]
 }
 
+type McpClient = Awaited<ReturnType<typeof createMCPClient>>
+type McpTools = Awaited<ReturnType<McpClient["tools"]>>
+type McpResources = {
+  client: McpClient
+  tools: McpTools
+}
+
+let mcpResourcesPromise: Promise<McpResources> | undefined
+
 const createFallbackResponse = (text: string) => {
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
@@ -38,10 +47,40 @@ const createFallbackResponse = (text: string) => {
   return createUIMessageStreamResponse({ stream })
 }
 
-const closeMcpClient = async (
-  client: Awaited<ReturnType<typeof createMCPClient>>
-) => {
+const closeMcpClient = async (client: McpClient) => {
   await client.close().catch(() => undefined)
+}
+
+const initializeMcpResources = async (): Promise<McpResources> => {
+  const client = await createMCPClient({
+    transport: {
+      type: "http",
+      url: MCP_SERVER_URL,
+    },
+  })
+
+  try {
+    return {
+      client,
+      tools: await client.tools(),
+    }
+  } catch (error) {
+    await closeMcpClient(client)
+    throw error
+  }
+}
+
+const getMcpResources = async () => {
+  if (!mcpResourcesPromise) {
+    mcpResourcesPromise = initializeMcpResources()
+  }
+
+  try {
+    return await mcpResourcesPromise
+  } catch (error) {
+    mcpResourcesPromise = undefined
+    throw error
+  }
 }
 
 export async function POST(request: Request) {
@@ -49,56 +88,40 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as ChatRequest
     const messages = payload.messages ?? []
     const modelMessages = await convertToModelMessages(messages)
-    const mcpClient = await createMCPClient({
-      transport: {
-        type: "http",
-        url: MCP_SERVER_URL,
-      },
-    })
+    const { tools } = await getMcpResources()
 
-    try {
-      const tools = await mcpClient.tools()
+    if (Object.keys(tools).length === 0) {
+      return createFallbackResponse(SUPPORT_REPLY)
+    }
 
-      if (Object.keys(tools).length === 0) {
-        await closeMcpClient(mcpClient)
-        return createFallbackResponse(SUPPORT_REPLY)
-      }
-
-      const result = streamText({
-        model: ollama(OLLAMA_MODEL),
-        system: `You are a helpful assistant that can only answer requests by using the available MCP tools.
+    const result = streamText({
+      model: ollama(OLLAMA_MODEL),
+      system: `You are a helpful assistant that can only answer requests by using the available MCP tools.
 
 When an available MCP tool can fulfill the user's request, you MUST call the appropriate tool before answering. Never invent tools or arguments, and make arguments match the tool schema.
 
 If none of the available MCP tools can fulfill the request, reply exactly with:
 ${SUPPORT_REPLY}`,
-        messages: modelMessages,
-        stopWhen: stepCountIs(5),
-        toolChoice: "auto",
-        tools,
-        providerOptions: {
-          ollama: {
-            think: true,
-          },
+      messages: modelMessages,
+      stopWhen: stepCountIs(5),
+      toolChoice: "auto",
+      tools,
+      providerOptions: {
+        ollama: {
+          think: false,
         },
-        onFinish: async () => {
-          await closeMcpClient(mcpClient)
-        },
-      })
+      },
+    })
 
-      const stream = toUIMessageStream({
-        onError: () => SUPPORT_REPLY,
-        originalMessages: messages,
-        sendReasoning: true,
-        stream: result.stream,
-        tools,
-      })
+    const stream = toUIMessageStream({
+      onError: () => SUPPORT_REPLY,
+      originalMessages: messages,
+      sendReasoning: true,
+      stream: result.stream,
+      tools,
+    })
 
-      return createUIMessageStreamResponse({ stream })
-    } catch {
-      await closeMcpClient(mcpClient)
-      return createFallbackResponse(SUPPORT_REPLY)
-    }
+    return createUIMessageStreamResponse({ stream })
   } catch {
     return createFallbackResponse(SUPPORT_REPLY)
   }
