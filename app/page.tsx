@@ -1,44 +1,15 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
-import {
-  DefaultChatTransport,
-  isReasoningUIPart,
-  isToolUIPart,
-  type UIMessage,
-} from "ai"
-import {
-  BotIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  MessageCircleIcon,
-  UserRoundIcon,
-  XIcon,
-} from "lucide-react"
+import { DefaultChatTransport, type UIMessage } from "ai"
+import { MessageCircleIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 
 import {
   Conversation,
   ConversationContent,
-  ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation"
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message"
-import {
-  ModelSelector,
-  ModelSelectorContent,
-  ModelSelectorEmpty,
-  ModelSelectorGroup,
-  ModelSelectorInput,
-  ModelSelectorItem,
-  ModelSelectorList,
-  ModelSelectorName,
-  ModelSelectorTrigger,
-} from "@/components/ai-elements/model-selector"
 import {
   PromptInput,
   PromptInputBody,
@@ -47,195 +18,19 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   type PromptInputMessage,
-  usePromptInputController,
 } from "@/components/ai-elements/prompt-input"
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning"
-import { SpeechInput } from "@/components/ai-elements/speech-input"
-import { Suggestion } from "@/components/ai-elements/suggestion"
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { ChatEmptyState } from "@/components/chatbot/chat-empty-state"
+import { ChatMessage } from "@/components/chatbot/chat-message"
+import {
+  ModelSelectorMenu,
+  type ModelId,
+} from "@/components/chatbot/model-selector-menu"
+import { SpeechInputButton } from "@/components/chatbot/speech-input-button"
 
 const transport = new DefaultChatTransport({
   api: process.env.NEXT_PUBLIC_MCP_CHAT_URL ?? "/api/chat",
 })
-
-const suggestions = [
-  "What can you help me with?",
-  "Summarize the latest updates",
-  "Find relevant documentation",
-]
-
-const AVAILABLE_MODELS = [
-  {
-    description: "Fast and lightweight",
-    id: "qwen2.5:1.5b",
-    name: "Qwen 2.5 1.5B",
-  },
-  {
-    description: "Reasoning-focused model",
-    id: "qwen3:0.6b",
-    name: "Qwen 3 0.6B",
-  },
-] as const
-
-type ModelId = (typeof AVAILABLE_MODELS)[number]["id"]
-
-type ModelSelectorMenuProps = {
-  disabled?: boolean
-  onValueChange: (value: ModelId) => void
-  value: ModelId
-}
-
-const ModelSelectorMenu = ({
-  disabled,
-  onValueChange,
-  value,
-}: ModelSelectorMenuProps) => {
-  const [open, setOpen] = useState(false)
-  const selectedModel = AVAILABLE_MODELS.find((model) => model.id === value)
-
-  return (
-    <ModelSelector onOpenChange={setOpen} open={open}>
-      <ModelSelectorTrigger
-        render={
-          <Button
-            aria-label="Select Ollama model"
-            className="max-w-40"
-            disabled={disabled}
-            size="sm"
-            type="button"
-            variant="outline"
-          />
-        }
-      >
-        <span className="truncate">{selectedModel?.name ?? value}</span>
-        <ChevronDownIcon />
-      </ModelSelectorTrigger>
-      <ModelSelectorContent
-        className="top-auto right-4 bottom-28 left-4 w-auto max-w-none translate-x-0 translate-y-0 sm:right-6 sm:left-auto sm:w-[388px] sm:max-w-[388px]"
-        title="Select an Ollama model"
-      >
-        <ModelSelectorInput placeholder="Search models..." />
-        <ModelSelectorList>
-          <ModelSelectorEmpty>No Ollama models found.</ModelSelectorEmpty>
-          <ModelSelectorGroup heading="Available models">
-            {AVAILABLE_MODELS.map((model) => (
-              <ModelSelectorItem
-                key={model.id}
-                onSelect={() => {
-                  onValueChange(model.id)
-                  setOpen(false)
-                }}
-                value={`${model.name} ${model.id}`}
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <ModelSelectorName>{model.name}</ModelSelectorName>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {model.id} · {model.description}
-                  </span>
-                </div>
-                {model.id === value && (
-                  <CheckIcon className="size-4 text-primary" />
-                )}
-              </ModelSelectorItem>
-            ))}
-          </ModelSelectorGroup>
-        </ModelSelectorList>
-      </ModelSelectorContent>
-    </ModelSelector>
-  )
-}
-
-const SpeechInputButton = () => {
-  const { textInput } = usePromptInputController()
-
-  const handleTranscriptionChange = (transcription: string) => {
-    const text = transcription.trim()
-
-    if (!text) {
-      return
-    }
-
-    const separator = textInput.value && !/\s$/.test(textInput.value) ? " " : ""
-    textInput.setInput(`${textInput.value}${separator}${text}`)
-  }
-
-  return (
-    <SpeechInput
-      aria-label="Use voice input"
-      onTranscriptionChange={handleTranscriptionChange}
-      size="icon-sm"
-      title="Use voice input"
-      variant="ghost"
-    />
-  )
-}
-
-const getText = (message: UIMessage) =>
-  message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("")
-
-const renderPart = (
-  message: UIMessage,
-  part: UIMessage["parts"][number],
-  index: number,
-  isStreaming: boolean
-) => {
-  const key = `${message.id}-${index}`
-
-  if (part.type === "text") {
-    return (
-      <MessageResponse key={key} isAnimating={isStreaming}>
-        {part.text}
-      </MessageResponse>
-    )
-  }
-
-  if (isReasoningUIPart(part)) {
-    return (
-      <Reasoning defaultOpen={false} key={key} isStreaming={isStreaming}>
-        <ReasoningTrigger />
-        <ReasoningContent>{part.text}</ReasoningContent>
-      </Reasoning>
-    )
-  }
-
-  if (isToolUIPart(part)) {
-    return (
-      <Tool key={key}>
-        {part.type === "dynamic-tool" ? (
-          <ToolHeader
-            state={part.state}
-            toolName={part.toolName}
-            type={part.type}
-          />
-        ) : (
-          <ToolHeader state={part.state} type={part.type} />
-        )}
-        <ToolContent>
-          <ToolInput input={part.input} />
-          <ToolOutput errorText={part.errorText} output={part.output} />
-        </ToolContent>
-      </Tool>
-    )
-  }
-
-  return null
-}
 
 export default function Chat() {
   const [isOpen, setIsOpen] = useState(false)
@@ -254,6 +49,25 @@ export default function Chat() {
     }
 
     void sendMessage({ text: trimmedText }, { body: { model: selectedModel } })
+  }
+
+  const handleToolInputSubmit = (
+    toolName: string,
+    input: Record<string, unknown>
+  ) => {
+    if (isBusy) {
+      return
+    }
+
+    void sendMessage(
+      { text: `Provided additional information for ${toolName}.` },
+      {
+        body: {
+          model: selectedModel,
+          toolCall: { arguments: input, name: toolName },
+        },
+      }
+    )
   }
 
   const handleSubmit = ({ text }: PromptInputMessage) => {
@@ -303,108 +117,20 @@ export default function Chat() {
             <Conversation className="min-h-0 flex-1">
               <ConversationContent className="mx-auto w-full max-w-3xl">
                 {messages.length === 0 ? (
-                  <ConversationEmptyState>
-                    <div className="flex max-w-xl flex-col items-center gap-6 text-center">
-                      <div className="space-y-2">
-                        <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted">
-                          <MessageCircleIcon className="size-6 text-muted-foreground" />
-                        </div>
-                        <h2 className="text-lg font-semibold">
-                          How can I help?
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          Ask a question to start a streamed conversation.
-                        </p>
-                      </div>
-                      <div className="flex w-full flex-col gap-2">
-                        {suggestions.map((suggestion) => (
-                          <Suggestion
-                            className="h-auto min-h-9 w-full justify-start text-left whitespace-normal"
-                            key={suggestion}
-                            onClick={handleSuggestion}
-                            suggestion={suggestion}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </ConversationEmptyState>
+                  <ChatEmptyState onSuggestion={handleSuggestion} />
                 ) : (
-                  messages.map((message) => {
-                    const isLastAssistantMessage =
-                      message.id === lastMessage?.id &&
-                      message.role === "assistant"
-
-                    const messageContent = (
-                      <>
-                        {message.parts.map((part, index) =>
-                          renderPart(
-                            message,
-                            part,
-                            index,
-                            isBusy && isLastAssistantMessage
-                          )
-                        )}
-                        {message.role === "assistant" &&
-                          !getText(message) &&
-                          isLastAssistantMessage &&
-                          isBusy && (
-                            <MessageResponse isAnimating>
-                              Thinking...
-                            </MessageResponse>
-                          )}
-                      </>
-                    )
-
-                    return (
-                      <div
-                        className={
-                          message.role === "user"
-                            ? "flex w-full flex-row-reverse items-start gap-2"
-                            : "flex w-full items-start gap-2"
-                        }
-                        key={message.id}
-                      >
-                        <Avatar
-                          aria-label={
-                            message.role === "user"
-                              ? "User message"
-                              : "Assistant message"
-                          }
-                          size="sm"
-                        >
-                          <AvatarFallback
-                            className={
-                              message.role === "user"
-                                ? "bg-secondary text-secondary-foreground"
-                                : "bg-primary text-primary-foreground"
-                            }
-                          >
-                            {message.role === "user" ? (
-                              <UserRoundIcon aria-hidden="true" />
-                            ) : (
-                              <BotIcon aria-hidden="true" />
-                            )}
-                          </AvatarFallback>
-                        </Avatar>
-                        <Message
-                          className="max-w-full min-w-0"
-                          from={message.role}
-                        >
-                          {message.role === "assistant" ? (
-                            <Card className="w-fit max-w-full gap-0 border-border/60 py-0 shadow-sm">
-                              <CardContent className="p-3">
-                                {messageContent}
-                              </CardContent>
-                            </Card>
-                          ) : (
-                            <MessageContent className="max-w-full break-words">
-                              {messageContent}
-                            </MessageContent>
-                          )}
-                        </Message>
-                      </div>
-                    )
-                  })
+                  messages.map((message: UIMessage) => (
+                    <ChatMessage
+                      isStreaming={
+                        isBusy &&
+                        message.id === lastMessage?.id &&
+                        message.role === "assistant"
+                      }
+                      key={message.id}
+                      message={message}
+                      onToolInputSubmit={handleToolInputSubmit}
+                    />
+                  ))
                 )}
               </ConversationContent>
               <ConversationScrollButton />
