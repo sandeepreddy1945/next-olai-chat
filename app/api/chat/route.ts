@@ -12,7 +12,7 @@ import {
 import { createOllama } from "ollama-ai-provider-v2"
 
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:8000/mcp"
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen3:0.6b"
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:1.5b"
 const OLLAMA_BASE_URL =
   process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/api"
 const SUPPORT_REPLY =

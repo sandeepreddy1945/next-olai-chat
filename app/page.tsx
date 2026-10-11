@@ -25,15 +25,18 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputProvider,
   PromptInputSubmit,
   PromptInputTextarea,
   type PromptInputMessage,
+  usePromptInputController,
 } from "@/components/ai-elements/prompt-input"
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning"
+import { SpeechInput } from "@/components/ai-elements/speech-input"
 import { Suggestion } from "@/components/ai-elements/suggestion"
 import {
   Tool,
@@ -55,6 +58,31 @@ const suggestions = [
   "Summarize the latest updates",
   "Find relevant documentation",
 ]
+
+const SpeechInputButton = () => {
+  const { textInput } = usePromptInputController()
+
+  const handleTranscriptionChange = (transcription: string) => {
+    const text = transcription.trim()
+
+    if (!text) {
+      return
+    }
+
+    const separator = textInput.value && !/\s$/.test(textInput.value) ? " " : ""
+    textInput.setInput(`${textInput.value}${separator}${text}`)
+  }
+
+  return (
+    <SpeechInput
+      aria-label="Use voice input"
+      onTranscriptionChange={handleTranscriptionChange}
+      size="icon-sm"
+      title="Use voice input"
+      variant="ghost"
+    />
+  )
+}
 
 const getText = (message: UIMessage) =>
   message.parts
@@ -298,20 +326,25 @@ export default function Chat() {
                 </div>
               )}
 
-              <PromptInput onSubmit={handleSubmit}>
-                <PromptInputBody>
-                  <PromptInputTextarea placeholder="Ask your MCP assistant..." />
-                </PromptInputBody>
-                <PromptInputFooter>
-                  <p className="text-xs text-muted-foreground">
-                    Enter to send · Shift+Enter for a new line
-                  </p>
-                  <PromptInputSubmit
-                    onStop={isBusy ? () => void stop() : undefined}
-                    status={status}
-                  />
-                </PromptInputFooter>
-              </PromptInput>
+              <PromptInputProvider>
+                <PromptInput onSubmit={handleSubmit}>
+                  <PromptInputBody>
+                    <PromptInputTextarea placeholder="Ask your MCP assistant..." />
+                  </PromptInputBody>
+                  <PromptInputFooter>
+                    <p className="text-xs text-muted-foreground">
+                      Enter to send · Shift+Enter for a new line
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <SpeechInputButton />
+                      <PromptInputSubmit
+                        onStop={isBusy ? () => void stop() : undefined}
+                        status={status}
+                      />
+                    </div>
+                  </PromptInputFooter>
+                </PromptInput>
+              </PromptInputProvider>
             </div>
           </div>
         </section>
