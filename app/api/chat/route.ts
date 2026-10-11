@@ -20,8 +20,11 @@ const SUPPORT_REPLY =
 
 const ollama = createOllama({ baseURL: OLLAMA_BASE_URL })
 
+const AVAILABLE_MODELS = new Set(["qwen2.5:1.5b", "qwen3:0.6b"])
+
 type ChatRequest = {
   messages?: UIMessage[]
+  model?: string
 }
 
 type McpClient = Awaited<ReturnType<typeof createMCPClient>>
@@ -88,6 +91,10 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as ChatRequest
     const messages = payload.messages ?? []
     const modelMessages = await convertToModelMessages(messages)
+    const model =
+      payload.model && AVAILABLE_MODELS.has(payload.model)
+        ? payload.model
+        : OLLAMA_MODEL
     const { tools } = await getMcpResources()
 
     if (Object.keys(tools).length === 0) {
@@ -95,7 +102,7 @@ export async function POST(request: Request) {
     }
 
     const result = streamText({
-      model: ollama(OLLAMA_MODEL),
+      model: ollama(model),
       system: `You are a helpful assistant that can only answer requests by using the available MCP tools.
 
 When an available MCP tool can fulfill the user's request, you MUST call the appropriate tool before answering. Never invent tools or arguments, and make arguments match the tool schema.

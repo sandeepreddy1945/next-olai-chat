@@ -37,11 +37,13 @@ export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
 export const ModelSelectorContent = ({
   className,
   children,
+  showOverlay = false,
   title = "Model Selector",
   ...props
 }: ModelSelectorContentProps) => (
   <DialogContent
     aria-describedby={undefined}
+    showOverlay={showOverlay}
     className={cn(
       "border-none! p-0 outline! outline-border! outline-solid!",
       className

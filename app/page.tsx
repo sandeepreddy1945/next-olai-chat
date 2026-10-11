@@ -7,7 +7,14 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai"
-import { BotIcon, MessageCircleIcon, UserRoundIcon, XIcon } from "lucide-react"
+import {
+  BotIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MessageCircleIcon,
+  UserRoundIcon,
+  XIcon,
+} from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -21,6 +28,17 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message"
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from "@/components/ai-elements/model-selector"
 import {
   PromptInput,
   PromptInputBody,
@@ -58,6 +76,87 @@ const suggestions = [
   "Summarize the latest updates",
   "Find relevant documentation",
 ]
+
+const AVAILABLE_MODELS = [
+  {
+    description: "Fast and lightweight",
+    id: "qwen2.5:1.5b",
+    name: "Qwen 2.5 1.5B",
+  },
+  {
+    description: "Reasoning-focused model",
+    id: "qwen3:0.6b",
+    name: "Qwen 3 0.6B",
+  },
+] as const
+
+type ModelId = (typeof AVAILABLE_MODELS)[number]["id"]
+
+type ModelSelectorMenuProps = {
+  disabled?: boolean
+  onValueChange: (value: ModelId) => void
+  value: ModelId
+}
+
+const ModelSelectorMenu = ({
+  disabled,
+  onValueChange,
+  value,
+}: ModelSelectorMenuProps) => {
+  const [open, setOpen] = useState(false)
+  const selectedModel = AVAILABLE_MODELS.find((model) => model.id === value)
+
+  return (
+    <ModelSelector onOpenChange={setOpen} open={open}>
+      <ModelSelectorTrigger
+        render={
+          <Button
+            aria-label="Select Ollama model"
+            className="max-w-40"
+            disabled={disabled}
+            size="sm"
+            type="button"
+            variant="outline"
+          />
+        }
+      >
+        <span className="truncate">{selectedModel?.name ?? value}</span>
+        <ChevronDownIcon />
+      </ModelSelectorTrigger>
+      <ModelSelectorContent
+        className="top-auto right-4 bottom-28 left-4 w-auto max-w-none translate-x-0 translate-y-0 sm:right-6 sm:left-auto sm:w-[388px] sm:max-w-[388px]"
+        title="Select an Ollama model"
+      >
+        <ModelSelectorInput placeholder="Search models..." />
+        <ModelSelectorList>
+          <ModelSelectorEmpty>No Ollama models found.</ModelSelectorEmpty>
+          <ModelSelectorGroup heading="Available models">
+            {AVAILABLE_MODELS.map((model) => (
+              <ModelSelectorItem
+                key={model.id}
+                onSelect={() => {
+                  onValueChange(model.id)
+                  setOpen(false)
+                }}
+                value={`${model.name} ${model.id}`}
+              >
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <ModelSelectorName>{model.name}</ModelSelectorName>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {model.id} · {model.description}
+                  </span>
+                </div>
+                {model.id === value && (
+                  <CheckIcon className="size-4 text-primary" />
+                )}
+              </ModelSelectorItem>
+            ))}
+          </ModelSelectorGroup>
+        </ModelSelectorList>
+      </ModelSelectorContent>
+    </ModelSelector>
+  )
+}
 
 const SpeechInputButton = () => {
   const { textInput } = usePromptInputController()
@@ -140,26 +239,29 @@ const renderPart = (
 
 export default function Chat() {
   const [isOpen, setIsOpen] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<ModelId>("qwen2.5:1.5b")
   const { messages, sendMessage, status, error, clearError, stop } = useChat({
     transport,
   })
   const isBusy = status === "submitted" || status === "streaming"
   const lastMessage = messages.at(-1)
 
-  const handleSubmit = ({ text }: PromptInputMessage) => {
+  const sendText = (text: string) => {
     const trimmedText = text.trim()
 
     if (!trimmedText || isBusy) {
       return
     }
 
-    void sendMessage({ text: trimmedText })
+    void sendMessage({ text: trimmedText }, { body: { model: selectedModel } })
+  }
+
+  const handleSubmit = ({ text }: PromptInputMessage) => {
+    sendText(text)
   }
 
   const handleSuggestion = (suggestion: string) => {
-    if (!isBusy) {
-      void sendMessage({ text: suggestion })
-    }
+    sendText(suggestion)
   }
 
   return (
@@ -336,6 +438,11 @@ export default function Chat() {
                       Enter to send · Shift+Enter for a new line
                     </p>
                     <div className="flex items-center gap-1">
+                      <ModelSelectorMenu
+                        disabled={isBusy}
+                        onValueChange={setSelectedModel}
+                        value={selectedModel}
+                      />
                       <SpeechInputButton />
                       <PromptInputSubmit
                         onStop={isBusy ? () => void stop() : undefined}
